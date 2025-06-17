@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>定位组件排查页</title>
+    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <style>
+      body {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+
+      input,
+      button {
+        height: 40px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <input id="keyInput" autocomplete="on" name="key" oninput="onKey()" />
+    <button id="allowButton" onclick="onAllow()">iframe是否有allow(有)</button>
+    <button onclick="onFirstMethod()">调用方式一(JS)</button>
+    <button onclick="onSecondMethod()">调用方式二(iframe)</button>
+    <button onclick="onThirdMethod()">调用方式三(JS)</button>
+    <button id="highAccuracyButton" onclick="onNewHighAccuracy()">新方式是否高精(否)</button>
+    <button onclick="onNewIframe()">新方式iframe</button>
+    <button onclick="onNewJS()">新方式JS</button>
+    <button onclick="onLocationPickerIframe()">地图选点iframe</button>
+
+    <script>
+      try {
+        eruda.init();
+      } catch {}
+
+      let key = '';
+      const keyInputDOM = document.querySelector('#keyInput');
+      const onKey = () => {
+        key = keyInputDOM.value;
+      };
+      const referer = 'demo';
+
+      // allow处理
+      let isAllow = true;
+      const allowButtonDOM = document.querySelector('#allowButton');
+      const onAllow = () => {
+        isAllow = !isAllow;
+        allowButtonDOM.innerHTML = `iframe是否有allow(${isAllow ? '有' : '无'})`;
+      };
+
+      // 加载js
+      const loadJS = (src) =>
+        new Promise((resolve) => {
+          const scriptDOM = document.createElement('script');
+          scriptDOM.src = src;
+          scriptDOM.onload = resolve;
+          document.body.appendChild(scriptDOM);
+        });
+
+      // 加载iframe
+      const loadIframe = (src) =>
+        new Promise((resolve) => {
+          const iframeDOM = document.createElement('iframe');
+          iframeDOM.src = src;
+          if (isAllow) {
+            iframeDOM.allow = 'geolocation *';
+          }
+          iframeDOM.width = 0;
+          iframeDOM.height = 0;
+          iframeDOM.style.border = 'none';
+          iframeDOM.onload = () => resolve(iframeDOM);
+          document.body.appendChild(iframeDOM);
+        });
+
+      // 方式一
+      let firstMethodInstance;
+      const onFirstMethod = async () => {
+        if (!firstMethodInstance) {
+          await loadJS('https://mapapi.qq.com/web/mapComponents/geoLocation/v/geolocation.min.js');
+          firstMethodInstance = new qq.maps.Geolocation(key, referer);
+        }
+        firstMethodInstance.getLocation(
+          (data) => {
+            console.log('firstMethod success', data);
+          },
+          (data) => {
+            console.log('firstMethod error', data);
+          },
+        );
+      };
+
+      // 方式二
+      let secondMethodIframe;
+      const onSecondMethod = async () => {
+        if (!secondMethodIframe) {
+          secondMethodIframe = await loadIframe(
+            `https://apis.map.qq.com/tools/geolocation?key=${key}&referer=${referer}`,
+          );
+
+          window.addEventListener(
+            'message',
+            function ({ data }) {
+              if (data?.module === 'geolocation') {
+                console.log(data);
+              }
+            },
+            false,
+          );
+        }
+
+        secondMethodIframe.contentWindow.postMessage('getLocation', '*');
+      };
+
+      // 方式三
+      let thirdMethodInstance;
+      const onThirdMethod = async () => {
+        if (!thirdMethodInstance) {
+          await loadJS(`https://apis.map.qq.com/tools/geolocation/min?key=${key}&referer=${referer}`);
+          thirdMethodInstance = new qq.maps.Geolocation();
+        }
+
+        thirdMethodInstance.getLocation(
+          (data) => {
+            console.log('thirdMethod success', data);
+          },
+          (data) => {
+            console.log('thirdMethod error', data);
+          },
+        );
+      };
+
+      // 高精处理
+      let highAccuracy = false;
+      const highAccuracyDOM = document.querySelector('#highAccuracyButton');
+      const onNewHighAccuracy = () => {
+        highAccuracy = !highAccuracy;
+        highAccuracyDOM.innerHTML = `新方式是否高精(${highAccuracy ? '是' : '否'})`;
+      };
+      // 超时直接挂载
+      window.timeout = 8000;
+
+      // 新方式iframe
+      let newIframeDOM;
+      const onNewIframe = async () => {
+        if (!newIframeDOM) {
+          newIframeDOM = await loadIframe(
+            `https://mapapi.qq.com/web/lbs/h5-components/test/geolocation.html?key=${key}&referer=${referer}&immediate=0`,
+          );
+
+          window.addEventListener('message', ({ data }) => {
+            if (data?.source !== 'lbs-geolocation' && !data?.func) {
+              return;
+            }
+
+            switch (data.func) {
+              case 'getLocation': {
+                const { result } = data;
+                console.log(result?.module ? 'newIframe success' : 'newIframe error', result);
+
+                break;
+              }
+            }
+          });
+        }
+
+        newIframeDOM.contentWindow.postMessage(
+          { func: 'getLocation', options: { timeout: window.timeout, highAccuracy } },
+          '*',
+        );
+      };
+
+      // 新方式JS
+      let newJSInstance;
+      const onNewJS = async () => {
+        if (!newJSInstance) {
+          await loadJS('https://mapapi.qq.com/web/lbs/h5-components/geolocation.min.js');
+          newJSInstance = new window.LBS.WebComponent.Geolocation({ key, referer });
+        }
+
+        newJSInstance.getLocation(
+          (data) => {
+            console.log('newJS success', data);
+          },
+          (data) => {
+            console.log('newJS error', data);
+          },
+          { timeout: window.timeout, highAccuracy },
+        );
+      };
+
+      // 地图选点iframe
+      let locationPickerIframeDOM;
+      const onLocationPickerIframe = async () => {
+        if (!locationPickerIframeDOM) {
+          locationPickerIframeDOM = await loadIframe(
+            `https://apis.map.qq.com/tools/locpicker?search=1&type=1&key=${key}&referer=${referer}`,
+          );
+
+          locationPickerIframeDOM.width = '100%';
+          locationPickerIframeDOM.height = '700px';
+          locationPickerIframeDOM.style.margin = '100px 0';
+          locationPickerIframeDOM.style.border = '2px solid #000';
+          locationPickerIframeDOM.style.borderRadius = '10px';
+
+          window.addEventListener(
+            'message',
+            function ({ data }) {
+              if (data?.module == 'locationPicker') {
+                //防止其他应用也会向该页面post信息，需判断module是否为'locationPicker'
+                console.log('locationPicker', data);
+              }
+            },
+            false,
+          );
+        }
+      };
+    </script>
+  </body>
+</html>
