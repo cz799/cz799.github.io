@@ -1,99 +1,21 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>地图选点排查页</title>
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+    <title>地图选点组件PageA</title>
     <style>
-      body {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-      }
-
-      input,
-      button {
-        height: 40px;
+      * {
+        margin: 0;
+        padding: 0;
+        border: none;
       }
     </style>
   </head>
-
   <body>
-    <input id="keyInput" autocomplete="on" name="key" oninput="onKey()" />
-    <button id="allowButton" onclick="onAllow()">iframe是否有allow(有)</button>
-    <button onclick="onLocationPickerIframe()">地图选点iframe</button>
-
-    <script>
-      try {
-        eruda.init();
-      } catch {}
-
-      let key = '';
-      const keyInputDOM = document.querySelector('#keyInput');
-      const onKey = () => {
-        key = keyInputDOM.value;
-      };
-      const referer = 'demo';
-
-      // allow处理
-      let isAllow = true;
-      const allowButtonDOM = document.querySelector('#allowButton');
-      const onAllow = () => {
-        isAllow = !isAllow;
-        allowButtonDOM.innerHTML = `iframe是否有allow(${isAllow ? '有' : '无'})`;
-      };
-
-      // 加载js
-      const loadJS = (src) =>
-        new Promise((resolve) => {
-          const scriptDOM = document.createElement('script');
-          scriptDOM.src = src;
-          scriptDOM.onload = resolve;
-          document.body.appendChild(scriptDOM);
-        });
-
-      // 加载iframe
-      const loadIframe = (src) =>
-        new Promise((resolve) => {
-          const iframeDOM = document.createElement('iframe');
-          iframeDOM.src = src;
-          if (isAllow) {
-            iframeDOM.allow = 'geolocation *';
-          }
-          iframeDOM.width = 0;
-          iframeDOM.height = 0;
-          iframeDOM.style.border = 'none';
-          iframeDOM.onload = () => resolve(iframeDOM);
-          document.body.appendChild(iframeDOM);
-        });
-
-      // 地图选点iframe
-      let locationPickerIframeDOM;
-      const onLocationPickerIframe = async () => {
-        if (!locationPickerIframeDOM) {
-          locationPickerIframeDOM = await loadIframe(
-            `https://apis.map.qq.com/tools/locpicker?search=1&type=1&key=${key}&referer=${referer}`,
-          );
-
-          locationPickerIframeDOM.width = '100%';
-          locationPickerIframeDOM.height = '700px';
-          locationPickerIframeDOM.style.margin = '100px 0';
-          locationPickerIframeDOM.style.border = '2px solid #000';
-          locationPickerIframeDOM.style.borderRadius = '10px';
-
-          window.addEventListener(
-            'message',
-            function ({ data }) {
-              if (data?.module == 'locationPicker') {
-                //防止其他应用也会向该页面post信息，需判断module是否为'locationPicker'
-                console.log('locationPicker', data);
-              }
-            },
-            false,
-          );
-        }
-      };
-    </script>
+    <iframe
+      style="width: 100vw; height: 100vh"
+      src="https://mapapi.qq.com/web/mapComponents/locationPicker/v/index.html?search=1&type=1&key=3JQBZ-XLML4-YZWUG-X5JJY-RXYY2-IFFX4&referer=myapp&zoom=17&coord=39.786987%2C116.565691"
+    />
   </body>
 </html>
